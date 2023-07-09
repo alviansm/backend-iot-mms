@@ -8,6 +8,7 @@ var mongoose = require('mongoose');
 var mqtt = require('mqtt');
 var app = express();
 var cors = require('cors');
+var bodyParser = require('body-parser');
 
 //
 app.use(cors());
@@ -25,6 +26,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json())
 
 // ROUTES
 const apiRouter = require('./routes/api');
@@ -57,8 +60,13 @@ async function query_to_mongodb() {
         charging: array_message[19]
     });
     try {
-        const new_query_to_database = await message_to_query.save();
-        console.log("Berhasil query message ke database");
+        if (array_message[0].length > 0) {
+            const new_query_to_database = await message_to_query.save();
+            console.log("Berhasil query message ke database");
+        } else {
+            console.log("Tidak ada message untuk diquery");
+        }
+        
     } catch {
         console.log("Gagal menyimpan message ke database");
     }
