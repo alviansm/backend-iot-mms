@@ -161,4 +161,15 @@ client.on('message', (topic, message) => {
     }
 });
 
+const port = process.env.PORT || 4000;
+
+app.listen(port, (err, res) => {
+  if (err) {
+    console.log(err);
+    return res.status(500).send(err.message);
+  } else {
+    console.log(`[INFO] Running on port ${port}`)
+  }
+});
+
 module.exports = app;
