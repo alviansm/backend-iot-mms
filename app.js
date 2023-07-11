@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
@@ -9,25 +8,87 @@ var mqtt = require('mqtt');
 var app = express();
 var cors = require('cors');
 var bodyParser = require('body-parser');
-
-//
-app.use(cors());
+var timeout = require('express-timeout-handler');
+var swaggerJsdoc = require("swagger-jsdoc");
+var swaggerUi = require("swagger-ui-express");
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
 // database connect
+app.use(cors());
 mongoose.connect(process.env.DATABASE_URL, {
-    useNewUrlParser: true
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
 });
 const db = mongoose.connection;
 db.on('error', (error) => console.log("Koneksi ke database gagal"));
 db.once('open', () => console.log("Berhasil terkoneksikan ke database"));
+
+var options_timeout = {
+
+    timeout: 150000, // 2.5 minute limit timeout
+  
+    onTimeout: function(req, res) {
+      res.status(503).send('Service unavailable. Please retry.');
+    },
+  
+    // Optional. Define a function to be called if an attempt to send a response
+    // happens after the timeout where:
+    // - method: is the method that was called on the response object
+    // - args: are the arguments passed to the method
+    // - requestTime: is the duration of the request
+    // timeout happened
+    onDelayedResponse: function(req, method, args, requestTime) {
+      console.log(`Attempted to call ${method} after timeout`);
+    },
+  
+    // Optional. Provide a list of which methods should be disabled on the
+    // response object when a timeout happens and an error has been sent. If
+    // omitted, a default list of all methods that tries to send a response
+    // will be disable on the response object
+    disable: ['write', 'setHeaders', 'send', 'json', 'end']
+};
+
+const options_docs = {
+    definition: {
+      openapi: "3.1.0",
+      info: {
+        title: "IoT Based EMS",
+        version: "1.0.0",
+        description:
+          "REST API untuk Sistem Manajemen Energi Berbasis IoT pada Kontainer Berpendingin",
+        license: {
+          name: "MIT",
+          url: "https://spdx.org/licenses/MIT.html",
+        },
+        contact: {
+          name: "AlviansMaulana",
+          email: "alviansmaulana@email.com",
+        },
+      },
+      servers: [
+        {
+          url: process.env.HOST_URL,
+        },
+      ],
+    },
+    apis: ["./routes/*.js"],
+};
+  
+const specs = swaggerJsdoc(options_docs);
+app.use(
+"/api-docs",
+swaggerUi.serve,
+swaggerUi.setup(specs)
+);
 
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(bodyParser.urlencoded({ extended: false }))
-app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(timeout.handler(options_timeout));
 
 // ROUTES
 const apiRouter = require('./routes/api');
@@ -78,18 +139,26 @@ const topic = "esp32/ecoreefermms-topic";
 
 // MQTT connection setting
 client.on('connect', () => {    
-    if (client.connected === true) {                
-        console.log(`Berhasil mengkoneksikan ke broker Mosquitto MQTT`);
+    try {
+        if (client.connected === true) {                
+            console.log(`Berhasil mengkoneksikan ke broker Mosquitto MQTT`);
+        }
+        client.subscribe(topic);
+    } catch {
+        console.log("Error saat mengkoneksikan ke MQTT")
     }
-    client.subscribe(topic);
 });
 // Receive a message from subscribed topic
 var array_message = [];
 client.on('message', (topic, message) => {
-    const temp_message = String(message);
-    array_message = temp_message.split(",");
-    console.log(`message: ${array_message}`);
-    query_to_mongodb();
+    try {
+        const temp_message = String(message);
+        array_message = temp_message.split(",");
+        console.log(`message: ${array_message}`);
+        query_to_mongodb();
+    } catch {
+        console.log("Error query to database")
+    }
 });
 
 module.exports = app;
