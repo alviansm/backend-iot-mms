@@ -2,7 +2,7 @@
   "name": "backend-iot-mms",
   "version": "0.1.0",
   "private": true,
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js"
