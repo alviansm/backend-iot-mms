@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Api = require('../models/api');
 const mqtt = require('mqtt');
-const timeout = require('express-timeout-handler');
+const XLSX = require('xlsx')
 
 /**
  * @swagger
@@ -106,11 +106,6 @@ const timeout = require('express-timeout-handler');
  *   post:
  *     summary: Perintah switch kompresor ke MQTT
  *     tags: [API]
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Api'
  *     responses:
  *       200:
  *         description: Berhasil mendapatkan data
@@ -125,11 +120,6 @@ const timeout = require('express-timeout-handler');
  *   post:
  *     summary: Perintah switch fan evap ke MQTT
  *     tags: [API]
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Api'
  *     responses:
  *       200:
  *         description: Berhasil mendapatkan data
@@ -144,11 +134,6 @@ const timeout = require('express-timeout-handler');
  *   post:
  *     summary: Perintah switch mode eco ke MQTT
  *     tags: [API]
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Api'
  *     responses:
  *       200:
  *         description: Berhasil mendapatkan data
@@ -199,12 +184,16 @@ const timeout = require('express-timeout-handler');
  *         description: Server Error
  *
  */
+
+const password = "suksespkmkc2023";
+
+
 router.get('/', async (req, res) => {
     try {
         const latest_data = await Api.findOne({}, {}, {sort: {'createdAt': -1}});
         res.status(200).json(latest_data);
     } catch {
-        res.status(500).json({msg: "Gagal mendapatkana data"});
+        res.status(500).json({msg: "Gagal mendapatkan data"});
     }
 });
 
@@ -213,18 +202,23 @@ router.post('/switch-compressor', async (req, res) => {
     const client = mqtt.connect('mqtt://test.mosquitto.org');
     const message = "Status: Kompresor";
     const topic = "esp32/ecoreefermms-topic-status";
+    const data = req.body;
 
-    try {
-        client.on('connect', () => {
-            if (client.connected === true ) {
-                console.log("Koneksi ke MQTT berhasil - Publish");
-            }
-            client.publish(topic, message);
-            res.status(200).json({msg: "Publish: Switch kompresor berhasil"});
-        });
-    } catch {
-        res.status(500).json({msg: "Gagal melakukan switch kompresor"});
-    }
+    if (data.password == password) {
+        try {
+            client.on('connect', () => {
+                if (client.connected === true ) {
+                    console.log("Koneksi ke MQTT berhasil - Publish");
+                }
+                client.publish(topic, message);
+                res.status(200).json({msg: "Publish: Switch kompresor berhasil"});
+            });
+        } catch {
+            res.status(500).json({msg: "Gagal melakukan switch kompresor"});
+        }
+    } else {
+        res.status(401).json({msg: "Password salah"});
+    }    
 });
 
 // api to switch evaporator fan 
@@ -232,18 +226,24 @@ router.post('/switch-evap-fan', async (req, res) => {
     const client = mqtt.connect('mqtt://test.mosquitto.org');
     const message = "Status: Evap Fan";
     const topic = "esp32/ecoreefermms-topic-status";
+    const data = req.body;
 
-    try {
-        client.on('connect', () => {
-            if (client.connected === true ) {
-                console.log("Koneksi ke MQTT berhasil - Publish");
-            }
-            client.publish(topic, message);
-            res.status(200).json({msg: "Publish: Switch evaporator fan berhasil"});
-        });
-    } catch {
-        res.status(500).json({msg: "Gagal melakukan switch evaporator"});
+    if (data.password == password) {
+        try {
+            client.on('connect', () => {
+                if (client.connected === true ) {
+                    console.log("Koneksi ke MQTT berhasil - Publish");
+                }
+                client.publish(topic, message);
+                res.status(200).json({msg: "Publish: Switch evaporator fan berhasil"});
+            });
+        } catch {
+            res.status(500).json({msg: "Gagal melakukan switch evaporator"});
+        }
+    } else {
+        res.status(401).json({msg: "Password salah"});
     }
+    
 });
 
 // api to switch eco mode
@@ -251,18 +251,23 @@ router.post('/switch-eco', async (req, res) => {
     const client = mqtt.connect('mqtt://test.mosquitto.org');
     const message = "Publish: Swithc mode eco berhasil";
     const topic = "esp32/ecoreefermms-topic-status";
+    const data = req.body;
 
-    try {
-        client.on('connect', () => {
-            if (client.connected === true ) {
-                console.log("Koneksi ke MQTT berhasil - Publish");
-            }
-            client.publish(topic, "Status: Eco");
-            res.status(200).json({msg: message});
-        });
-    } catch {
-        res.status(500).json({msg: "Gagal melakukan switch"});
-    }
+    if (data.password == password) {
+        try {
+            client.on('connect', () => {
+                if (client.connected === true ) {
+                    console.log("Koneksi ke MQTT berhasil - Publish");
+                }
+                client.publish(topic, "Status: Eco");
+                res.status(200).json({msg: message});
+            });
+        } catch {
+            res.status(500).json({msg: "Gagal melakukan switch"});
+        }
+    } else {
+        res.status(401).json({msg: "Password salah"});
+    }    
 });
 
 // api to submit the set point
@@ -272,28 +277,64 @@ router.post('/change-setpoint', async (req, res) => {
     const topic = "esp32/ecoreefermms-topic-status";
     const data = req.body;
 
-    try {
-        client.on('connect', () => {
-            if (client.connected === true ) {
-                console.log("Koneksi ke MQTT berhasil - Publish");
-            }
-            console.log(data);
-            client.publish(topic, "Status: Set Point");
-            client.publish(topic, String(data.setpoint));
-            res.status(200).json({msg: "Publish mengubah set point menjadi x"});
-        });
-    } catch {
-        res.status(500).json({msg: "Gagal mengubah set point"});
+    if (data.password == password) {
+        try {
+            client.on('connect', () => {
+                if (client.connected === true ) {
+                    console.log("Koneksi ke MQTT berhasil - Publish");
+                }
+                console.log(data);
+                client.publish(topic, "Status: Set Point");
+                client.publish(topic, String(data.setpoint));
+                res.status(200).json({msg: "Publish mengubah set point menjadi x"});
+            });
+        } catch {
+            res.status(500).json({msg: "Gagal mengubah set point"});
+        }
+    } else {
+        res.status(401).json({msg: "Password salah"});
     }
+    
 });
 
-// api to delete all data from database
-router.delete('/remove-all-data', async (req, res) => {
+router.post('/check-password', async(req, res) => {
+    const data = req.body;
+
     try {
-        const api_data = await Api.deleteMany({});
-        res.json({message: "all data removed"});
+        console.log(data);
+        if (data.password == password) {
+            res.status(200).json({msg: "Password benar"});
+        } else {
+            res.status(401).json({msg: "Password salah"});
+        }
     } catch {
-        res.status(500).json({message: err.message});
+        res.status(500).json({msg: "Server Error"});
+    }
+})
+
+// api to delete all data from database
+router.post('/remove-all-data', async (req, res) => {
+    const data = req.body;
+
+    if (data.password == password) {
+        try {
+            const api_data = await Api.deleteMany({});
+            res.json({message: "all data removed"});
+        } catch {
+            res.status(500).json({message: "Gagal menghapus data"});
+        }
+    } else {
+        res.status(401).json({msg: "Password salah"});
+    }    
+});
+
+// download csv data
+router.get('/download-csv', async (req, res) => {
+    try {
+        const data = await Api.find({}, {}, {sort: {'createdAt': -1}});
+        res.status(200).attachment("SemuaData.txt").send(data);
+    } catch {
+        res.status(500).json({msg: "Gagal mendapatkan data"});
     }
 });
 
